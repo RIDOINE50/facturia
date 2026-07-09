@@ -1,0 +1,37 @@
+name: facturia
+description: "A new Flutter project."
+publish_to: 'none' 
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  device_preview: ^1.1.0
+  google_fonts: ^6.1.0
+  flutter_dotenv: ^5.1.0
+  supabase_flutter: ^2.5.0
+  url_launcher: ^6.2.5
+  pdf: ^3.10.8
+  printing: ^5.12.0
+  path_provider: ^2.1.2
+  share_plus: ^10.1.4  # ← VERSION MISE À JOUR (était 7.2.1)
+  shared_preferences: ^2.2.2
+  http: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter 
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+  fonts:                                    # ← AJOUTE CETTE SECTION
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
