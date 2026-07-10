@@ -4,7 +4,7 @@ class AuthService {
   static final SupabaseClient _client = Supabase.instance.client;
 
   // ==========================================
-  // INSCRIPTION
+  // INSCRIPTION PAR EMAIL (ancien)
   // ==========================================
   static Future<AuthResponse> signUp({
     required String email,
@@ -40,7 +40,44 @@ class AuthService {
   }
 
   // ==========================================
-  // CONNEXION (avec logs détaillés)
+  // INSCRIPTION PAR TÉLÉPHONE (NOUVEAU)
+  // ==========================================
+  static Future<AuthResponse> signUpWithPhone({
+    required String phone,
+    required String password,
+    required String firstName,
+    required String lastName,
+  }) async {
+    try {
+      print('📱 Tentative inscription téléphone : $phone');
+      
+      final response = await _client.auth.signUp(
+        phone: phone,
+        password: password,
+        data: {
+          'first_name': firstName,
+          'last_name': lastName,
+          'phone': phone,
+        },
+      );
+
+      if (response.user == null) {
+        throw Exception('Impossible de créer le compte');
+      }
+
+      print('✅ Utilisateur créé avec téléphone : ${response.user!.phone}');
+      return response;
+    } on AuthException catch (e) {
+      print('❌ Erreur Auth signup phone : ${e.message}');
+      throw Exception('Erreur Auth : ${e.message}');
+    } catch (e) {
+      print('❌ Erreur signup phone : $e');
+      throw Exception('Erreur : $e');
+    }
+  }
+
+  // ==========================================
+  // CONNEXION PAR EMAIL (ancien)
   // ==========================================
   static Future<AuthResponse> signIn({
     required String email,
@@ -73,6 +110,38 @@ class AuthService {
   }
 
   // ==========================================
+  // CONNEXION PAR TÉLÉPHONE (NOUVEAU)
+  // ==========================================
+  static Future<AuthResponse> signInWithPhone({
+    required String phone,
+    required String password,
+  }) async {
+    try {
+      print('📱 Tentative connexion téléphone : $phone');
+      
+      final response = await _client.auth.signInWithPassword(
+        phone: phone,
+        password: password,
+      );
+
+      if (response.user == null) {
+        print('❌ User null après connexion téléphone');
+        throw Exception('Numéro ou mot de passe incorrect');
+      }
+
+      print('✅ Connecté avec téléphone : ${response.user!.phone}');
+      print('✅ User ID : ${response.user!.id}');
+      return response;
+    } on AuthException catch (e) {
+      print('❌ ERREUR AUTH PHONE : ${e.message}');
+      throw Exception('Erreur : ${e.message}');
+    } catch (e) {
+      print('❌ ERREUR INCONNUE PHONE : $e');
+      throw Exception('Erreur : $e');
+    }
+  }
+
+  // ==========================================
   // DÉCONNEXION
   // ==========================================
   static Future<void> signOut() async {
@@ -87,7 +156,7 @@ class AuthService {
   }
 
   // ==========================================
-  // VÉRIFIER SI L'UTILISATEUR EST ADMIN (avec logs)
+  // VÉRIFIER SI L'UTILISATEUR EST ADMIN
   // ==========================================
   static Future<bool> isAdmin() async {
     try {
@@ -144,7 +213,7 @@ class AuthService {
   }
 
   // ==========================================
-  // CONNEXION + VÉRIFICATION RÔLE (méthode complète)
+  // CONNEXION + VÉRIFICATION RÔLE
   // ==========================================
   static Future<Map<String, dynamic>> signInAndCheckRole({
     required String email,
@@ -153,7 +222,6 @@ class AuthService {
     try {
       print('🔍 signInAndCheckRole: début pour $email');
       
-      // 1. Connexion
       final authResponse = await signIn(email: email, password: password);
       
       if (authResponse.user == null) {
@@ -162,7 +230,6 @@ class AuthService {
 
       print('✅ Connexion réussie, vérification du rôle...');
 
-      // 2. Vérifier le rôle
       final isAdminUser = await isAdmin();
       
       print('✅ Rôle vérifié : admin = $isAdminUser');
@@ -182,7 +249,7 @@ class AuthService {
   }
 
   // ==========================================
-  // COMPLÉTER LE PROFIL (Entreprise + Mobile Money)
+  // COMPLÉTER LE PROFIL
   // ==========================================
   static Future<void> completeProfile({
     required String userId,
@@ -260,7 +327,7 @@ class AuthService {
   }
 
   // ==========================================
-  // METTRE À JOUR LE RÔLE D'UN UTILISATEUR (Admin seulement)
+  // METTRE À JOUR LE RÔLE D'UN UTILISATEUR
   // ==========================================
   static Future<void> updateUserRole({
     required String userId,
@@ -284,7 +351,7 @@ class AuthService {
   }
 
   // ==========================================
-  // RÉCUPÉRER TOUS LES UTILISATEURS (Admin seulement)
+  // RÉCUPÉRER TOUS LES UTILISATEURS
   // ==========================================
   static Future<List<Map<String, dynamic>>> getAllUsers() async {
     try {
@@ -306,7 +373,7 @@ class AuthService {
   }
 
   // ==========================================
-  // METTRE À JOUR LE PROFIL (Prénom, Nom)
+  // METTRE À JOUR LE PROFIL
   // ==========================================
   static Future<void> updateProfile({
     required String userId,

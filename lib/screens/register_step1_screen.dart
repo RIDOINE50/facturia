@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../services/auth_service.dart';
-import 'register_step2_screen.dart';
 import 'login_screen.dart';
+import 'verify_otp_screen.dart';
 
 const Color kDarkBlue = Color(0xFF1E3A8A);
 const Color kOrange = Color(0xFFF59E0B);
@@ -21,7 +20,6 @@ class RegisterStep1Screen extends StatefulWidget {
 class _RegisterStep1ScreenState extends State<RegisterStep1Screen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -32,20 +30,19 @@ class _RegisterStep1ScreenState extends State<RegisterStep1Screen> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
-    _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleSignUp() async {
-    // Validation basique
+    // Validation
     if (_firstNameController.text.isEmpty ||
         _lastNameController.text.isEmpty ||
-        _emailController.text.isEmpty ||
+        _phoneController.text.isEmpty ||
         _passwordController.text.isEmpty) {
       setState(() {
-        _errorMessage = 'Veuillez remplir tous les champs obligatoires';
+        _errorMessage = 'Veuillez remplir tous les champs';
       });
       return;
     }
@@ -57,56 +54,56 @@ class _RegisterStep1ScreenState extends State<RegisterStep1Screen> {
       return;
     }
 
+    final phone = _phoneController.text.trim();
+    if (!phone.startsWith('+') || phone.length < 10) {
+      setState(() {
+        _errorMessage = 'Numéro invalide (ex: +22997000000)';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      // Créer le compte via Supabase
-      final response = await AuthService.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        firstName: _firstNameController.text.trim(),
-        lastName: _lastNameController.text.trim(),
-        phone: _phoneController.text.trim(),
+      // Envoyer le code OTP par SMS
+      await Supabase.instance.client.auth.signInWithOtp(
+        phone: phone,
       );
 
-      if (response.user != null) {
-        print('✅ Compte créé avec succès !');
-        
-        // Stocker l'ID utilisateur pour les étapes suivantes
+      print('✅ Code SMS envoyé à $phone');
+
+      if (mounted) {
+        // Aller à l'écran de vérification
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => RegisterStep2Screen(userId: response.user!.id),
+            builder: (context) => VerifyOtpScreen(
+              phone: phone,
+              firstName: _firstNameController.text.trim(),
+              lastName: _lastNameController.text.trim(),
+              password: _passwordController.text,
+            ),
           ),
         );
       }
     } on AuthException catch (e) {
       setState(() {
-        _errorMessage = _getErrorMessage(e.message);
+        _errorMessage = 'Erreur : ${e.message}';
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Une erreur est survenue : $e';
+        _errorMessage = 'Erreur : $e';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
-  }
-
-  String _getErrorMessage(String message) {
-    if (message.contains('already registered')) {
-      return 'Cet email est déjà utilisé';
-    } else if (message.contains('password')) {
-      return 'Mot de passe trop faible (minimum 6 caractères)';
-    } else if (message.contains('email')) {
-      return 'Email invalide';
-    }
-    return message;
   }
 
   @override
@@ -237,7 +234,7 @@ class _RegisterStep1ScreenState extends State<RegisterStep1Screen> {
                     ),
                     const SizedBox(height: 32),
 
-                    // Champ Prénom & Nom
+                    // Prénom & Nom
                     _buildLabel('PRÉNOM & NOM'),
                     const SizedBox(height: 8),
                     _buildTextField(
@@ -255,20 +252,8 @@ class _RegisterStep1ScreenState extends State<RegisterStep1Screen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Champ Email
-                    _buildLabel('EMAIL'),
-                    const SizedBox(height: 8),
-                    _buildTextField(
-                      controller: _emailController,
-                      hintText: 'kofi@gmail.com',
-                      icon: Icons.email,
-                      iconColor: Colors.purple[300]!,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Champ Téléphone
-                    _buildLabel('TÉLÉPHONE'),
+                    // Téléphone
+                    _buildLabel('NUMÉRO DE TÉLÉPHONE'),
                     const SizedBox(height: 8),
                     _buildTextField(
                       controller: _phoneController,
@@ -279,7 +264,7 @@ class _RegisterStep1ScreenState extends State<RegisterStep1Screen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Champ Mot de passe
+                    // Mot de passe
                     _buildLabel('MOT DE PASSE'),
                     const SizedBox(height: 8),
                     _buildTextField(
@@ -306,10 +291,7 @@ class _RegisterStep1ScreenState extends State<RegisterStep1Screen> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                               )
                             : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,

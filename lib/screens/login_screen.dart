@@ -6,7 +6,7 @@ import 'register_step1_screen.dart';
 import 'forgot_password_screen.dart';
 import 'dashboard_screen.dart';
 import 'admin/admin_main_screen.dart';
-// Couleurs exactes du design
+
 const Color kDarkBlue = Color(0xFF1E3A8A);
 const Color kOrange = Color(0xFFF59E0B);
 const Color kGrayText = Color(0xFF6B7280);
@@ -21,7 +21,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
+  final _contactController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
@@ -29,16 +29,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _contactController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-    Future<void> _handleLogin() async {
+  // Détecter si c'est un email ou un téléphone
+  bool _isPhone(String input) {
+    return RegExp(r'^[+]?[0-9]{10,15}$').hasMatch(input.replaceAll(' ', ''));
+  }
+
+  Future<void> _handleLogin() async {
+    final contact = _contactController.text.trim();
+    
     // Validation
-    if (_emailController.text.trim().isEmpty) {
+    if (contact.isEmpty) {
       setState(() {
-        _errorMessage = 'Veuillez entrer votre email';
+        _errorMessage = 'Veuillez entrer votre email ou numéro de téléphone';
       });
       return;
     }
@@ -56,26 +63,38 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // 1. Connexion via Supabase
-      final response = await AuthService.signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      final bool isPhone = _isPhone(contact);
+      AuthResponse response;
+
+      if (isPhone) {
+        // Connexion par téléphone
+        print('📱 Connexion par téléphone : $contact');
+        response = await AuthService.signInWithPhone(
+          phone: contact,
+          password: _passwordController.text,
+        );
+      } else {
+        // Connexion par email
+        print('📧 Connexion par email : $contact');
+        response = await AuthService.signIn(
+          email: contact,
+          password: _passwordController.text,
+        );
+      }
 
       if (response.user != null) {
-        print('✅ Connecté avec succès : ${response.user!.email}');
+        print('✅ Connecté avec succès');
         
-        // 2. VÉRIFIER LE RÔLE ICI ⬇️
+        // Vérifier le rôle
         final bool isAdmin = await AuthService.isAdmin();
         print('👉 Est-ce un admin ? $isAdmin');
         
         if (mounted) {
-          // 3. Rediriger selon le rôle
           if (isAdmin) {
             Navigator.of(context).pushAndRemoveUntil(
-  MaterialPageRoute(builder: (context) => const AdminMainScreen()),
-  (route) => false,
-);
+              MaterialPageRoute(builder: (context) => const AdminMainScreen()),
+              (route) => false,
+            );
           } else {
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(builder: (context) => const DashboardScreen()),
@@ -103,9 +122,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _getErrorMessage(String message) {
     if (message.contains('Invalid login credentials')) {
-      return 'Email ou mot de passe incorrect';
+      return 'Identifiants incorrects';
     } else if (message.contains('Email not confirmed')) {
-      return 'Veuillez confirmer votre email';
+      return 'Veuillez confirmer votre compte';
     } else if (message.contains('Too many requests')) {
       return 'Trop de tentatives. Réessayez dans quelques minutes';
     }
@@ -192,9 +211,9 @@ class _LoginScreenState extends State<LoginScreen> {
               _buildLabel('Email ou téléphone'),
               const SizedBox(height: 8),
               _buildTextField(
-                controller: _emailController,
-                hintText: 'kofi@gmail.com',
-                icon: Icons.email_outlined,
+                controller: _contactController,
+                hintText: 'kofi@gmail.com ou +22997000000',
+                icon: Icons.alternate_email,
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 20),
@@ -345,8 +364,6 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  // --- WIDGETS RÉUTILISABLES POUR LE DESIGN ---
 
   Widget _buildLabel(String text) {
     return Text(

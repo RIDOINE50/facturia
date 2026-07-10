@@ -1,9 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'onboarding_screen.dart';
+import 'login_screen.dart';
+import 'dashboard_screen.dart';
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    // Attendre 2 secondes pour afficher le splash
+    await Future.delayed(const Duration(seconds: 2));
+    
+    // Vérifier si l'utilisateur est déjà connecté
+    final session = Supabase.instance.client.auth.currentSession;
+    
+    if (!mounted) return;
+    
+    if (session != null) {
+      // ✅ Déjà connecté → Dashboard directement
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      );
+    }
+    // ❌ Sinon, on reste sur le splash (l'utilisateur choisit)
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,13 +71,11 @@ class SplashScreen extends StatelessWidget {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Icône document
                       const Icon(
                         Icons.description_rounded,
                         size: 56,
                         color: Colors.white,
                       ),
-                      // Petit cercle jaune en bas à droite
                       Positioned(
                         right: 18,
                         bottom: 18,
@@ -88,7 +119,6 @@ class SplashScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Sous-titre
                 Text(
                   'Facturation intelligente pour\nles entrepreneurs d\'Afrique de l\'Ouest',
                   textAlign: TextAlign.center,
@@ -130,7 +160,6 @@ class SplashScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                // Texte "— ou —"
                 Row(
                   children: [
                     const Expanded(
@@ -164,7 +193,12 @@ class SplashScreen extends StatelessWidget {
                   height: 56,
                   child: OutlinedButton(
                     onPressed: () {
-                      // Navigation vers login
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                      );
                     },
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(
@@ -186,7 +220,6 @@ class SplashScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 32),
-                // Badges en bas
                 Text(
                   'Disponible en FCFA · Mobile Money · 100% mobile',
                   style: GoogleFonts.inter(
