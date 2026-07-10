@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/kkiapay_service.dart';
+import 'kkiapay_webview_screen.dart';
 
 const Color kDarkBlue = Color(0xFF1E3A8A);
 const Color kOrange = Color(0xFFF59E0B);
@@ -61,10 +62,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final transactionId = 'FACTURIA_${DateTime.now().millisecondsSinceEpoch}';
 
     try {
-      // Simulation du paiement (2 secondes)
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Sauvegarder le paiement
+      // 1. Sauvegarder le paiement en attente dans Supabase
       await KKiaPayService.savePendingPayment(
         userId: userId,
         amount: amount,
@@ -72,16 +70,47 @@ class _PaymentScreenState extends State<PaymentScreen> {
         transactionId: transactionId,
       );
 
-      await KKiaPayService.updatePaymentStatus(
+      // 2. Générer l'URL de paiement KKiaPay
+      final paymentUrl = await KKiaPayService.generatePaymentUrl(
+        amount: amount,
         transactionId: transactionId,
-        status: 'success',
+        description: 'Abonnement FacturIA - Plan ${plan['name']}',
       );
+
+      if (paymentUrl == null) {
+        setState(() => _isProcessing = false);
+        _showError('Erreur lors de la génération du lien de paiement');
+        return;
+      }
 
       setState(() => _isProcessing = false);
 
-      if (mounted) {
-        _showSuccess(plan['name']);
+      // 3. Ouvrir l'interface KKiaPay DANS l'application
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => KkiapayWebviewScreen(
+            paymentUrl: paymentUrl,
+            transactionId: transactionId,
+          ),
+        ),
+      );
+
+      // 4. Traiter le résultat quand l'utilisateur revient
+      if (result != null && result['status'] == 'SUCCESS') {
+        // Le paiement a réussi !
+        await KKiaPayService.updatePaymentStatus(
+          transactionId: transactionId,
+          status: 'success',
+        );
+        if (mounted) _showSuccess(plan['name']);
+      } else {
+        // Annulé ou échoué
+        if (mounted) {
+          _showError('Paiement annulé ou non confirmé. Votre abonnement n\'a pas été activé.');
+        }
       }
+
     } catch (e) {
       setState(() => _isProcessing = false);
       _showError('Erreur : $e');
