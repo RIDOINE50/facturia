@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "773849820337",
+    "project_id": "facturia-410e2",
+    "storage_bucket": "facturia-410e2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:773849820337:android:09bca5debef4de73948690",
+        "android_client_info": {
+          "package_name": "com.example.facturia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfrKDcnAz2IqpRmu4EJy6tRNev02n89XI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

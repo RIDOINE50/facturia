@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'register_step2_screen.dart';
 
@@ -11,6 +12,7 @@ const Color kInputBorder = Color(0xFFD1D5DB);
 
 class VerifyOtpScreen extends StatefulWidget {
   final String phone;
+  final String verificationId;
   final String firstName;
   final String lastName;
   final String password;
@@ -18,6 +20,7 @@ class VerifyOtpScreen extends StatefulWidget {
   const VerifyOtpScreen({
     super.key,
     required this.phone,
+    required this.verificationId,
     required this.firstName,
     required this.lastName,
     required this.password,
@@ -80,30 +83,59 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
     });
 
     try {
-      // Vérifier le code OTP
-      final response = await Supabase.instance.client.auth.verifyOTP(
-        phone: widget.phone,
-        token: code,
-        type: OtpType.sms,
+      // 🔥 VÉRIFIER LE CODE AVEC FIREBASE
+      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: widget.verificationId,
+        smsCode: code,
       );
 
-      if (response.user != null) {
-        print('✅ Téléphone vérifié avec succès !');
-        
-        // Mettre à jour le profil avec les infos
-        await Supabase.instance.client.from('profiles').update({
-          'first_name': widget.firstName,
-          'last_name': widget.lastName,
-          'phone': widget.phone,
-        }).eq('id', response.user!.id);
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCredential.user;
 
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RegisterStep2Screen(userId: response.user!.id),
-            ),
+      if (user != null) {
+        print('✅ Téléphone vérifié avec succès !');
+        print('🆔 Firebase UID : ${user.uid}');
+
+        // 🔥 CRÉER LE COMPTE DANS SUPABASE
+        try {
+          // Créer l'utilisateur dans Supabase Auth avec email/password
+          final email = '${user.uid}@facturia.local'; // Email fictif basé sur l'UID Firebase
+          
+          final authResponse = await Supabase.instance.client.auth.signUp(
+            email: email,
+            password: widget.password,
           );
+
+          if (authResponse.user != null) {
+            // Mettre à jour le profil avec les infos
+            await Supabase.instance.client.from('profiles').update({
+              'first_name': widget.firstName,
+              'last_name': widget.lastName,
+              'phone': widget.phone,
+            }).eq('id', authResponse.user!.id);
+
+            print('✅ Compte Supabase créé !');
+
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RegisterStep2Screen(userId: authResponse.user!.id),
+                ),
+              );
+            }
+          }
+        } catch (supabaseError) {
+          print('⚠️ Erreur Supabase : $supabaseError');
+          // Si l'utilisateur existe déjà, on continue quand même
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RegisterStep2Screen(userId: user.uid),
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -122,12 +154,26 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
 
   Future<void> _resendCode() async {
     try {
-      await Supabase.instance.client.auth.resend(
-        type: OtpType.sms,
-        phone: widget.phone,
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Code renvoyé !')),
+      // 🔥 RENVOYER LE CODE AVEC FIREBASE
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: widget.phone,
+        verificationCompleted: (PhoneAuthCredential credential) {},
+        verificationFailed: (FirebaseAuthException e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur : ${e.message}')),
+          );
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Code renvoyé !')),
+          );
+          setState(() {
+            _timeLeft = 60;
+          });
+          _startTimer();
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {},
+        timeout: const Duration(seconds: 60),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

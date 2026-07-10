@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
 import 'verify_otp_screen.dart';
 
@@ -68,41 +68,55 @@ class _RegisterStep1ScreenState extends State<RegisterStep1Screen> {
     });
 
     try {
-      // Envoyer le code OTP par SMS
-      await Supabase.instance.client.auth.signInWithOtp(
-        phone: phone,
+      // 🔥 ENVOYER LE SMS VIA FIREBASE
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: phone,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Vérification automatique (Android uniquement)
+          print('✅ Vérification automatique réussie');
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Erreur : ${e.message}';
+          });
+          print('❌ Erreur Firebase : ${e.message}');
+        },
+        codeSent: (String verificationId, int? resendToken) async {
+          print('✅ Code SMS envoyé à $phone');
+          print('📝 Verification ID : $verificationId');
+
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+
+            // Aller à l'écran de vérification avec le verificationId
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VerifyOtpScreen(
+                  phone: phone,
+                  verificationId: verificationId,
+                  firstName: _firstNameController.text.trim(),
+                  lastName: _lastNameController.text.trim(),
+                  password: _passwordController.text,
+                ),
+              ),
+            );
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          print('⏱️ Timeout - Verification ID : $verificationId');
+        },
+        timeout: const Duration(seconds: 60),
       );
-
-      print('✅ Code SMS envoyé à $phone');
-
-      if (mounted) {
-        // Aller à l'écran de vérification
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VerifyOtpScreen(
-              phone: phone,
-              firstName: _firstNameController.text.trim(),
-              lastName: _lastNameController.text.trim(),
-              password: _passwordController.text,
-            ),
-          ),
-        );
-      }
-    } on AuthException catch (e) {
-      setState(() {
-        _errorMessage = 'Erreur : ${e.message}';
-      });
     } catch (e) {
       setState(() {
+        _isLoading = false;
         _errorMessage = 'Erreur : $e';
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      print('❌ Erreur : $e');
     }
   }
 
