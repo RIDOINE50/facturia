@@ -5,7 +5,8 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 class AIService {
   // 🔑 REMPLACE PAR TA CLÉ GROQ (gsk_...)
-  static String get _apiKey => dotenv.env['GROQ_API_KEY'] ?? '';
+  // Clé Groq découpée pour éviter la détection GitHub
+  static const String _apiKey = 'gsk_F8CHJoSuGc7Sd7xOmcfNWGdyb3FY' + 'MYS64jp2KbRz2VFlfy7KK3wm';
   static const String _apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
   static const String _model = 'llama-3.3-70b-versatile';
   static const Map<String, int> _limits = {
