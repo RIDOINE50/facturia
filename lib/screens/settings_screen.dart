@@ -7,7 +7,7 @@ import 'login_screen.dart';
 import 'change_password_screen.dart';
 import 'profile_screen.dart';
 import 'subscription_screen.dart';
-
+import 'company_settings_screen.dart';  // ← AJOUTE CETTE LIGNE
 const Color kDarkBlue = Color(0xFF1E3A8A);
 const Color kOrange = Color(0xFFF59E0B);
 const Color kGreen = Color(0xFF10B981);
@@ -308,27 +308,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // ==========================================
                   // SECTION FACTURATION
                   // ==========================================
-                  _buildSectionTitle('FACTURATION'),
-                  const SizedBox(height: 12),
-                  _buildSettingsCard([
-                    _buildSettingsTile(
-                      icon: Icons.description_outlined,
-                      iconColor: kDarkBlue,
-                      title: 'Modèle de facture',
-                      subtitle: 'Couleurs, logo, pied de page',
-                      onTap: () {},
-                    ),
-                    const Divider(height: 1, indent: 56),
-                    _buildSettingsTile(
-                      icon: Icons.attach_money,
-                      iconColor: kGreen,
-                      title: 'Devise',
-                      subtitle: 'FCFA (XOF)',
-                      onTap: () {},
-                    ),
-                  ]),
-
-                  const SizedBox(height: 24),
+                 // ==========================================
+// SECTION FACTURATION
+// ==========================================
+_buildSectionTitle('FACTURATION'),
+const SizedBox(height: 12),
+_buildSettingsCard([
+  _buildSettingsTile(
+    icon: Icons.business,
+    iconColor: kDarkBlue,
+    title: 'Identité de l\'entreprise',
+    subtitle: 'Logo, signature et cachet',
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const CompanySettingsScreen()),
+      );
+    },
+  ),
+  const Divider(height: 1, indent: 56),
+  _buildSettingsTile(
+    icon: Icons.description_outlined,
+    iconColor: kDarkBlue,
+    title: 'Modèle de facture',
+    subtitle: 'Couleurs, pied de page',
+    onTap: () {},
+  ),
+  const Divider(height: 1, indent: 56),
+  _buildSettingsTile(
+    icon: Icons.attach_money,
+    iconColor: kGreen,
+    title: 'Devise',
+    subtitle: 'FCFA (XOF)',
+    onTap: () {},
+  ),
+]),
 
                   // ==========================================
                   // SECTION NOTIFICATIONS

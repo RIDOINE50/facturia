@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.facturia"
-        minSdk = 23  // ← CHANGÉ : Firebase Phone Auth nécessite 23 minimum
+        minSdk = flutter.minSdkVersion  // ← CHANGÉ : Firebase Phone Auth nécessite 23 minimum
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
