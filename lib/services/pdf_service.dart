@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
@@ -16,10 +18,16 @@ class PdfService {
     required String clientPhone,
     required String clientEmail,
     required String clientAddress,
+    String? logoUrl,
+    String? signatureUrl,
+    String? stampUrl,
   }) async {
     final pdf = pw.Document();
 
-    // Couleurs
+    final logoImage = logoUrl != null ? await _downloadImage(logoUrl) : null;
+    final signatureImage = signatureUrl != null ? await _downloadImage(signatureUrl) : null;
+    final stampImage = stampUrl != null ? await _downloadImage(stampUrl) : null;
+
     final kDarkBlue = PdfColor.fromInt(0xFF1E3A8A);
     final kGray = PdfColor.fromInt(0xFF6B7280);
     final kLightGray = PdfColor.fromInt(0xFFF3F4F6);
@@ -32,42 +40,54 @@ class PdfService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // HEADER
+              // HEADER AVEC LOGO
               pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Expanded(
-                    child: pw.Column(
+                    child: pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text(
-                          companyName,
-                          style: pw.TextStyle(
-                            fontSize: 24,
-                            fontWeight: pw.FontWeight.bold,
-                            color: kDarkBlue,
+                        if (logoImage != null) ...[
+                          pw.Container(
+                            width: 80,
+                            height: 80,
+                            child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                          ),
+                          pw.SizedBox(width: 12),
+                        ],
+                        pw.Expanded(
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text(
+                                companyName,
+                                style: pw.TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: kDarkBlue,
+                                ),
+                              ),
+                              pw.SizedBox(height: 4),
+                              if (companyIfu.isNotEmpty)
+                                pw.Text(
+                                  'IFU: $companyIfu',
+                                  style: pw.TextStyle(fontSize: 10, color: kGray),
+                                ),
+                              pw.SizedBox(height: 8),
+                              pw.Text(companyAddress, style: pw.TextStyle(fontSize: 10, color: kGray)),
+                              pw.Text('Tel: $companyPhone', style: pw.TextStyle(fontSize: 10, color: kGray)),
+                              if (companyEmail.isNotEmpty)
+                                pw.Text(companyEmail, style: pw.TextStyle(fontSize: 10, color: kGray)),
+                            ],
                           ),
                         ),
-                        pw.SizedBox(height: 4),
-                        if (companyIfu.isNotEmpty)
-                          pw.Text(
-                            'IFU: $companyIfu',
-                            style: pw.TextStyle(fontSize: 10, color: kGray),
-                          ),
-                        pw.SizedBox(height: 8),
-                        pw.Text(companyAddress, style: pw.TextStyle(fontSize: 10, color: kGray)),
-                        pw.Text('Tel: $companyPhone', style: pw.TextStyle(fontSize: 10, color: kGray)),
-                        if (companyEmail.isNotEmpty)
-                          pw.Text(companyEmail, style: pw.TextStyle(fontSize: 10, color: kGray)),
                       ],
                     ),
                   ),
                   pw.Container(
                     padding: const pw.EdgeInsets.all(16),
-                    decoration: pw.BoxDecoration(
-                      color: kDarkBlue,
-                      borderRadius: pw.BorderRadius.circular(8),
-                    ),
+                    color: kDarkBlue,
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
@@ -95,10 +115,7 @@ class PdfService {
               // INFOS FACTURE
               pw.Container(
                 padding: const pw.EdgeInsets.all(12),
-                decoration: pw.BoxDecoration(
-                  color: kLightGray,
-                  borderRadius: pw.BorderRadius.circular(8),
-                ),
+                color: kLightGray,
                 child: pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
@@ -206,10 +223,7 @@ class PdfService {
               // CONDITIONS
               pw.Container(
                 padding: const pw.EdgeInsets.all(12),
-                decoration: pw.BoxDecoration(
-                  color: kLightGray,
-                  borderRadius: pw.BorderRadius.circular(8),
-                ),
+                color: kLightGray,
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
@@ -235,19 +249,85 @@ class PdfService {
                   ],
                 ),
               ),
+
+              // SIGNATURE ET CACHET
+              if (signatureImage != null || stampImage != null) ...[
+                pw.SizedBox(height: 40),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.end,
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    if (stampImage != null)
+                      pw.Container(
+                        width: 100,
+                        height: 100,
+                        margin: const pw.EdgeInsets.only(right: 20),
+                        child: pw.Column(
+                          children: [
+                            pw.Expanded(
+                              child: pw.Image(stampImage, fit: pw.BoxFit.contain),
+                            ),
+                            pw.SizedBox(height: 4),
+                            pw.Text(
+                              'Cachet',
+                              style: pw.TextStyle(fontSize: 9, color: kGray, fontStyle: pw.FontStyle.italic),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (signatureImage != null)
+                      pw.Container(
+                        width: 150,
+                        height: 100,
+                        child: pw.Column(
+                          children: [
+                            pw.Expanded(
+                              child: pw.Image(signatureImage, fit: pw.BoxFit.contain),
+                            ),
+                            pw.SizedBox(height: 4),
+                            pw.Container(
+                              width: double.infinity,
+                              decoration: pw.BoxDecoration(
+                                border: pw.Border(top: pw.BorderSide(color: kGray, width: 0.5)),
+                              ),
+                              padding: const pw.EdgeInsets.only(top: 4),
+                              child: pw.Text(
+                                'Signature',
+                                style: pw.TextStyle(fontSize: 9, color: kGray, fontStyle: pw.FontStyle.italic),
+                                textAlign: pw.TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ],
           );
         },
       ),
     );
 
-    // Sauvegarder le PDF
     final directory = await getTemporaryDirectory();
     final fileName = '${invoiceData.invoiceNumber}.pdf';
     final file = File('${directory.path}/$fileName');
     await file.writeAsBytes(await pdf.save());
 
     return file;
+  }
+
+  static Future<pw.MemoryImage?> _downloadImage(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        return pw.MemoryImage(response.bodyBytes);
+      }
+      return null;
+    } catch (e) {
+      print('Erreur telechargement image $url : $e');
+      return null;
+    }
   }
 
   static pw.Widget _buildTotalRow(String label, String value, PdfColor color, {bool isTotal = false}) {

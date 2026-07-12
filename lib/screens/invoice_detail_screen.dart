@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
 import '../services/data_service.dart';
+import '../services/pdf_service.dart';
+import '../models/invoice_data.dart';
 
 const Color kDarkBlue = Color(0xFF1E3A8A);
 const Color kGreen = Color(0xFF10B981);
@@ -31,6 +30,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   Map<String, dynamic>? _invoice;
   Map<String, dynamic>? _company;
   Map<String, dynamic>? _client;
+  Map<String, dynamic>? _userProfile;
   List<Map<String, dynamic>> _items = [];
   bool _isLoading = true;
 
@@ -58,11 +58,19 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           .select()
           .eq('invoice_id', widget.invoiceId);
 
+      // Récupérer le profil utilisateur pour avoir les URLs des images
+      final profileResponse = await Supabase.instance.client
+          .from('profiles')
+          .select('logo_url, signature_url, stamp_url')
+          .eq('id', user.id)
+          .maybeSingle();
+
       setState(() {
         _invoice = invoiceResponse;
         _company = companyResponse;
         _client = invoiceResponse['clients'];
         _items = List<Map<String, dynamic>>.from(itemsResponse);
+        _userProfile = profileResponse;
         _isLoading = false;
       });
     } catch (e) {
@@ -92,22 +100,114 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
   }
 
-  Future<void> _downloadPDF() async {
+    Future<void> _downloadPDF() async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('📄 Génération du PDF...'),
         backgroundColor: kDarkBlue,
       ),
     );
+
+    try {
+      // Créer l'objet InvoiceData
+      final invoiceData = InvoiceData();
+      invoiceData.invoiceNumber = _invoice!['invoice_number'] ?? '';
+      invoiceData.issueDate = DateTime.parse(_invoice!['issue_date']);
+      invoiceData.dueDate = _invoice!['due_date'] != null ? DateTime.parse(_invoice!['due_date']) : null;
+      invoiceData.items = _items.map((item) => InvoiceItem(
+        description: item['description'] ?? '',
+        quantity: (item['quantity'] as num).toInt(),
+        unitPrice: (item['unit_price'] as num).toDouble(),
+      )).toList();
+      invoiceData.applyTva = (_invoice!['tva_amount'] as num).toDouble() > 0;
+
+      // Générer le PDF avec les URLs des images
+      final pdfFile = await PdfService.generateInvoicePdf(
+        invoiceData: invoiceData,
+        companyName: _company!['name'] ?? '',
+        companyPhone: _company!['mobile_money_number'] ?? '',
+        companyEmail: _company!['email'] ?? '',
+        companyAddress: _company!['address'] ?? '',
+        companyIfu: _company!['ifu_nif'] ?? '',
+        clientName: _client?['name'] ?? '',
+        clientPhone: _client?['phone'] ?? '',
+        clientEmail: _client?['email'] ?? '',
+        clientAddress: _client?['address'] ?? '',
+        // URLs des images depuis Supabase
+        logoUrl: _userProfile?['logo_url'],
+        signatureUrl: _userProfile?['signature_url'],
+        stampUrl: _userProfile?['stamp_url'],
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ PDF généré : ${pdfFile.path}'),
+            backgroundColor: kGreen,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Erreur génération PDF : $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erreur : $e'),
+            backgroundColor: kRed,
+          ),
+        );
+      }
+    }
   }
 
-  Future<void> _shareInvoice() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('📤 Partage de la facture...'),
-        backgroundColor: kDarkBlue,
-      ),
-    );
+    Future<void> _shareInvoice() async {
+    try {
+      // Créer l'objet InvoiceData
+      final invoiceData = InvoiceData();
+      invoiceData.invoiceNumber = _invoice!['invoice_number'] ?? '';
+      invoiceData.issueDate = DateTime.parse(_invoice!['issue_date']);
+      invoiceData.dueDate = _invoice!['due_date'] != null ? DateTime.parse(_invoice!['due_date']) : null;
+      invoiceData.items = _items.map((item) => InvoiceItem(
+        description: item['description'] ?? '',
+        quantity: (item['quantity'] as num).toInt(),
+        unitPrice: (item['unit_price'] as num).toDouble(),
+      )).toList();
+      invoiceData.applyTva = (_invoice!['tva_amount'] as num).toDouble() > 0;
+
+      // Générer le PDF
+      final pdfFile = await PdfService.generateInvoicePdf(
+        invoiceData: invoiceData,
+        companyName: _company!['name'] ?? '',
+        companyPhone: _company!['mobile_money_number'] ?? '',
+        companyEmail: _company!['email'] ?? '',
+        companyAddress: _company!['address'] ?? '',
+        companyIfu: _company!['ifu_nif'] ?? '',
+        clientName: _client?['name'] ?? '',
+        clientPhone: _client?['phone'] ?? '',
+        clientEmail: _client?['email'] ?? '',
+        clientAddress: _client?['address'] ?? '',
+        logoUrl: _userProfile?['logo_url'],
+        signatureUrl: _userProfile?['signature_url'],
+        stampUrl: _userProfile?['stamp_url'],
+      );
+
+      // Partager le PDF
+      await Share.shareXFiles(
+        [XFile(pdfFile.path)],
+        text: 'Facture ${invoiceData.invoiceNumber}',
+      );
+    } catch (e) {
+      print('❌ Erreur partage : $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erreur : $e'),
+            backgroundColor: kRed,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _markAsPaid() async {
@@ -207,7 +307,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Logo + Entreprise
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,7 +373,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                     ),
                   ),
                   const SizedBox(width: 24),
-                  // FACTURE + Badge
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -371,7 +469,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                   _buildInfoItem(
                     Icons.business_outlined,
                     'IFU',
-                    _company!['ifu_nif'] ?? 'BJ-2023-00412',
+                    _company!['ifu_nif'] ?? '',
                   ),
                 ],
               ),
@@ -385,7 +483,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ÉMETTEUR
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(16),
@@ -433,7 +530,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // CLIENT
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(16),
@@ -496,7 +592,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
               ),
               child: Column(
                 children: [
-                  // En-tête sombre
                   Container(
                     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                     decoration: const BoxDecoration(
@@ -556,7 +651,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                       ],
                     ),
                   ),
-                  // Lignes
                   ...List.generate(_items.length, (index) {
                     final item = _items[index];
                     final isEven = index % 2 == 0;
@@ -635,7 +729,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // CONDITIONS
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(16),
@@ -683,21 +776,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'MTN: +229 97 12 34 56',
-                              style: GoogleFonts.inter(fontSize: 10, color: Colors.black87),
-                            ),
-                            const SizedBox(width: 16),
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.blue,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Icon(Icons.phone, color: Colors.white, size: 12),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Moov: +229 97 12 34 56',
+                              'MTN: ${_company!['mobile_money_number'] ?? ''}',
                               style: GoogleFonts.inter(fontSize: 10, color: Colors.black87),
                             ),
                           ],
@@ -707,7 +786,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // TOTAUX
                 SizedBox(
                   width: 280,
                   child: Container(
