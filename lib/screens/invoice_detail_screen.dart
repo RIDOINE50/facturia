@@ -45,6 +45,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
 
+      print('🔍 Chargement facture ID: ${widget.invoiceId}');
+      print('🔍 User ID: ${user.id}');
+
       final invoiceResponse = await Supabase.instance.client
           .from('invoices')
           .select('*, clients(*)')
@@ -64,6 +67,12 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           .select('logo_url, signature_url, stamp_url')
           .eq('id', user.id)
           .maybeSingle();
+
+      print('========================================');
+      print('🖼️ Logo URL : ${profileResponse?['logo_url']}');
+      print('✍️ Signature URL : ${profileResponse?['signature_url']}');
+      print('🔏 Stamp URL : ${profileResponse?['stamp_url']}');
+      print('========================================');
 
       setState(() {
         _invoice = invoiceResponse;
@@ -100,7 +109,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
   }
 
-    Future<void> _downloadPDF() async {
+  Future<void> _downloadPDF() async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('📄 Génération du PDF...'),
@@ -109,6 +118,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     );
 
     try {
+      print('🔍 Début génération PDF');
+      print('🔍 _userProfile: $_userProfile');
+
       // Créer l'objet InvoiceData
       final invoiceData = InvoiceData();
       invoiceData.invoiceNumber = _invoice!['invoice_number'] ?? '';
@@ -120,6 +132,14 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         unitPrice: (item['unit_price'] as num).toDouble(),
       )).toList();
       invoiceData.applyTva = (_invoice!['tva_amount'] as num).toDouble() > 0;
+
+      final logoUrl = _userProfile?['logo_url'];
+      final signatureUrl = _userProfile?['signature_url'];
+      final stampUrl = _userProfile?['stamp_url'];
+
+      print('🖼️ Logo URL passé au PDF : $logoUrl');
+      print('✍️ Signature URL passé au PDF : $signatureUrl');
+      print('🔏 Stamp URL passé au PDF : $stampUrl');
 
       // Générer le PDF avec les URLs des images
       final pdfFile = await PdfService.generateInvoicePdf(
@@ -133,11 +153,12 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         clientPhone: _client?['phone'] ?? '',
         clientEmail: _client?['email'] ?? '',
         clientAddress: _client?['address'] ?? '',
-        // URLs des images depuis Supabase
-        logoUrl: _userProfile?['logo_url'],
-        signatureUrl: _userProfile?['signature_url'],
-        stampUrl: _userProfile?['stamp_url'],
+        logoUrl: logoUrl,
+        signatureUrl: signatureUrl,
+        stampUrl: stampUrl,
       );
+
+      print('✅ PDF généré avec succès : ${pdfFile.path}');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -161,9 +182,8 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
   }
 
-    Future<void> _shareInvoice() async {
+  Future<void> _shareInvoice() async {
     try {
-      // Créer l'objet InvoiceData
       final invoiceData = InvoiceData();
       invoiceData.invoiceNumber = _invoice!['invoice_number'] ?? '';
       invoiceData.issueDate = DateTime.parse(_invoice!['issue_date']);
@@ -175,7 +195,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       )).toList();
       invoiceData.applyTva = (_invoice!['tva_amount'] as num).toDouble() > 0;
 
-      // Générer le PDF
       final pdfFile = await PdfService.generateInvoicePdf(
         invoiceData: invoiceData,
         companyName: _company!['name'] ?? '',
@@ -192,7 +211,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         stampUrl: _userProfile?['stamp_url'],
       );
 
-      // Partager le PDF
       await Share.shareXFiles(
         [XFile(pdfFile.path)],
         text: 'Facture ${invoiceData.invoiceNumber}',
@@ -294,9 +312,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ==========================================
-            // HEADER BLEU FONCÉ
-            // ==========================================
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -433,12 +448,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // ==========================================
-            // BARRE D'INFOS
-            // ==========================================
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -448,38 +458,17 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildInfoItem(
-                    Icons.calendar_today_outlined,
-                    'Date d\'émission',
-                    _formatDate(_invoice!['issue_date']),
-                  ),
+                  _buildInfoItem(Icons.calendar_today_outlined, 'Date d\'émission', _formatDate(_invoice!['issue_date'])),
                   Container(width: 1, height: 40, color: Colors.grey.shade300),
-                  _buildInfoItem(
-                    Icons.event_outlined,
-                    'Date d\'échéance',
-                    _formatDate(_invoice!['due_date']),
-                  ),
+                  _buildInfoItem(Icons.event_outlined, 'Date d\'échéance', _formatDate(_invoice!['due_date'])),
                   Container(width: 1, height: 40, color: Colors.grey.shade300),
-                  _buildInfoItem(
-                    Icons.payment_outlined,
-                    'Mode de paiement',
-                    _company!['mobile_money_operator'] ?? 'MTN Mobile Money',
-                  ),
+                  _buildInfoItem(Icons.payment_outlined, 'Mode de paiement', _company!['mobile_money_operator'] ?? 'MTN Mobile Money'),
                   Container(width: 1, height: 40, color: Colors.grey.shade300),
-                  _buildInfoItem(
-                    Icons.business_outlined,
-                    'IFU',
-                    _company!['ifu_nif'] ?? '',
-                  ),
+                  _buildInfoItem(Icons.business_outlined, 'IFU', _company!['ifu_nif'] ?? ''),
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // ==========================================
-            // ÉMETTEUR ET CLIENT
-            // ==========================================
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -494,37 +483,13 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'ÉMETTEUR',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: kGrayText,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        Text('ÉMETTEUR', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: kGrayText, letterSpacing: 0.5)),
                         const SizedBox(height: 12),
-                        Text(
-                          _company!['name'] ?? '',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
+                        Text(_company!['name'] ?? '', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
                         const SizedBox(height: 8),
-                        Text(
-                          _company!['address'] ?? '',
-                          style: GoogleFonts.inter(fontSize: 11, color: kGrayText),
-                        ),
-                        Text(
-                          'Tél: ${_company!['mobile_money_number'] ?? ''}',
-                          style: GoogleFonts.inter(fontSize: 11, color: kGrayText),
-                        ),
-                        Text(
-                          'IFU: ${_company!['ifu_nif'] ?? ''}',
-                          style: GoogleFonts.inter(fontSize: 11, color: kGrayText),
-                        ),
+                        Text(_company!['address'] ?? '', style: GoogleFonts.inter(fontSize: 11, color: kGrayText)),
+                        Text('Tél: ${_company!['mobile_money_number'] ?? ''}', style: GoogleFonts.inter(fontSize: 11, color: kGrayText)),
+                        Text('IFU: ${_company!['ifu_nif'] ?? ''}', style: GoogleFonts.inter(fontSize: 11, color: kGrayText)),
                       ],
                     ),
                   ),
@@ -541,49 +506,20 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'FACTURÉ À',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: kGrayText,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        Text('FACTURÉ À', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: kGrayText, letterSpacing: 0.5)),
                         const SizedBox(height: 12),
-                        Text(
-                          _client?['name'] ?? '',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
+                        Text(_client?['name'] ?? '', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
                         const SizedBox(height: 8),
-                        Text(
-                          _client?['address'] ?? '',
-                          style: GoogleFonts.inter(fontSize: 11, color: kGrayText),
-                        ),
-                        Text(
-                          'Tél: ${_client?['phone'] ?? ''}',
-                          style: GoogleFonts.inter(fontSize: 11, color: kGrayText),
-                        ),
-                        Text(
-                          _client?['email'] ?? '',
-                          style: GoogleFonts.inter(fontSize: 11, color: kGrayText),
-                        ),
+                        Text(_client?['address'] ?? '', style: GoogleFonts.inter(fontSize: 11, color: kGrayText)),
+                        Text('Tél: ${_client?['phone'] ?? ''}', style: GoogleFonts.inter(fontSize: 11, color: kGrayText)),
+                        Text(_client?['email'] ?? '', style: GoogleFonts.inter(fontSize: 11, color: kGrayText)),
                       ],
                     ),
                   ),
                 ),
               ],
             ),
-
             const SizedBox(height: 24),
-
-            // ==========================================
-            // TABLEAU DES ARTICLES
-            // ==========================================
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -600,54 +536,10 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                     ),
                     child: Row(
                       children: [
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            'DESCRIPTION',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            'QTÉ',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            'PRIX UNITAIRE',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            'MONTANT HT',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                            textAlign: TextAlign.right,
-                          ),
-                        ),
+                        Expanded(flex: 3, child: Text('DESCRIPTION', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.5))),
+                        Expanded(child: Text('QTÉ', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.5), textAlign: TextAlign.center)),
+                        Expanded(child: Text('PRIX UNITAIRE', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.5), textAlign: TextAlign.center)),
+                        Expanded(child: Text('MONTANT HT', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.5), textAlign: TextAlign.right)),
                       ],
                     ),
                   ),
@@ -658,9 +550,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                       decoration: BoxDecoration(
                         color: isEven ? Colors.white : kLightGray,
-                        border: Border(
-                          bottom: BorderSide(color: Colors.grey.shade200),
-                        ),
+                        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
                       ),
                       child: Row(
                         children: [
@@ -669,50 +559,15 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  item['description'] ?? '',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
-                                  ),
-                                ),
+                                Text(item['description'] ?? '', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
                                 const SizedBox(height: 4),
-                                Text(
-                                  item['description'] ?? '',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10,
-                                    color: kGrayText,
-                                  ),
-                                ),
+                                Text(item['description'] ?? '', style: GoogleFonts.inter(fontSize: 10, color: kGrayText)),
                               ],
                             ),
                           ),
-                          Expanded(
-                            child: Text(
-                              item['quantity'].toString(),
-                              style: GoogleFonts.inter(fontSize: 12, color: Colors.black87),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              '${_formatAmount((item['unit_price'] as num).toDouble())}\nFCFA',
-                              style: GoogleFonts.inter(fontSize: 11, color: kGrayText),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              '${_formatAmount((item['total_price'] as num).toDouble())}\nFCFA',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                              textAlign: TextAlign.right,
-                            ),
-                          ),
+                          Expanded(child: Text(item['quantity'].toString(), style: GoogleFonts.inter(fontSize: 12, color: Colors.black87), textAlign: TextAlign.center)),
+                          Expanded(child: Text('${_formatAmount((item['unit_price'] as num).toDouble())}\nFCFA', style: GoogleFonts.inter(fontSize: 11, color: kGrayText), textAlign: TextAlign.center)),
+                          Expanded(child: Text('${_formatAmount((item['total_price'] as num).toDouble())}\nFCFA', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87), textAlign: TextAlign.right)),
                         ],
                       ),
                     );
@@ -720,65 +575,28 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // ==========================================
-            // CONDITIONS ET TOTAUX
-            // ==========================================
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: kLightGray,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    decoration: BoxDecoration(color: kLightGray, borderRadius: BorderRadius.circular(8)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'CONDITIONS DE PAIEMENT',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: kGrayText,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        Text('CONDITIONS DE PAIEMENT', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: kGrayText, letterSpacing: 0.5)),
                         const SizedBox(height: 8),
-                        Text(
-                          'Paiement dû dans les 30 jours suivant la date d\'émission. En cas de retard, pénalités de 1,5% par mois appliquées.',
-                          style: GoogleFonts.inter(fontSize: 10, color: kGrayText, height: 1.5),
-                        ),
+                        Text('Paiement dû dans les 30 jours suivant la date d\'émission. En cas de retard, pénalités de 1,5% par mois appliquées.', style: GoogleFonts.inter(fontSize: 10, color: kGrayText, height: 1.5)),
                         const SizedBox(height: 12),
-                        Text(
-                          'MODES DE PAIEMENT ACCEPTÉS',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: kGrayText,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        Text('MODES DE PAIEMENT ACCEPTÉS', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: kGrayText, letterSpacing: 0.5)),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: kGreen,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Icon(Icons.phone_android, color: Colors.white, size: 12),
-                            ),
+                            Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: kGreen, borderRadius: BorderRadius.circular(4)), child: const Icon(Icons.phone_android, color: Colors.white, size: 12)),
                             const SizedBox(width: 8),
-                            Text(
-                              'MTN: ${_company!['mobile_money_number'] ?? ''}',
-                              style: GoogleFonts.inter(fontSize: 10, color: Colors.black87),
-                            ),
+                            Text('MTN: ${_company!['mobile_money_number'] ?? ''}', style: GoogleFonts.inter(fontSize: 10, color: Colors.black87)),
                           ],
                         ),
                       ],
@@ -790,45 +608,21 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                   width: 280,
                   child: Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade200)),
                     child: Column(
                       children: [
                         _buildTotalRowWidget('Sous-total HT', '${_formatAmount(subtotal)} FCFA'),
                         const SizedBox(height: 8),
-                        if (tvaAmount > 0)
-                          _buildTotalRowWidget('TVA (18%)', '${_formatAmount(tvaAmount)} FCFA'),
+                        if (tvaAmount > 0) _buildTotalRowWidget('TVA (18%)', '${_formatAmount(tvaAmount)} FCFA'),
                         const SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: kDarkBlue,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                          decoration: BoxDecoration(color: kDarkBlue, borderRadius: BorderRadius.circular(8)),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'TOTAL\nTTC',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  height: 1.2,
-                                ),
-                              ),
-                              Text(
-                                '${_formatAmount(totalAmount)}\nFCFA',
-                                style: GoogleFonts.inter(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  height: 1.2,
-                                ),
-                              ),
+                              Text('TOTAL\nTTC', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white, height: 1.2)),
+                              Text('${_formatAmount(totalAmount)}\nFCFA', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white, height: 1.2)),
                             ],
                           ),
                         ),
@@ -838,22 +632,14 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 24),
-
-            // ==========================================
-            // BOUTON PAYÉE
-            // ==========================================
             if (!isPaid)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _markAsPaid,
                   icon: const Icon(Icons.check_circle, size: 20),
-                  label: Text(
-                    'PAYÉE',
-                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
+                  label: Text('PAYÉE', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kGreen,
                     foregroundColor: Colors.white,
@@ -862,7 +648,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                   ),
                 ),
               ),
-
             const SizedBox(height: 40),
           ],
         ),
@@ -875,17 +660,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       children: [
         Icon(icon, color: kDarkBlue, size: 20),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.inter(fontSize: 10, color: kGrayText),
-          textAlign: TextAlign.center,
-        ),
+        Text(label, style: GoogleFonts.inter(fontSize: 10, color: kGrayText), textAlign: TextAlign.center),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
-          textAlign: TextAlign.center,
-        ),
+        Text(value, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87), textAlign: TextAlign.center),
       ],
     );
   }
@@ -894,14 +671,8 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(fontSize: 12, color: kGrayText),
-        ),
-        Text(
-          value,
-          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
-        ),
+        Text(label, style: GoogleFonts.inter(fontSize: 12, color: kGrayText)),
+        Text(value, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
       ],
     );
   }
