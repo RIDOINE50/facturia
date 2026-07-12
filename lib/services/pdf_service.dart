@@ -22,11 +22,21 @@ class PdfService {
     String? signatureUrl,
     String? stampUrl,
   }) async {
+    print('🔍 [PDF] Début génération PDF');
+    print('🔍 [PDF] Logo URL : $logoUrl');
+    print('🔍 [PDF] Signature URL : $signatureUrl');
+    print('🔍 [PDF] Stamp URL : $stampUrl');
+
     final pdf = pw.Document();
 
+    print('🔍 [PDF] Téléchargement des images...');
     final logoImage = logoUrl != null ? await _downloadImage(logoUrl) : null;
     final signatureImage = signatureUrl != null ? await _downloadImage(signatureUrl) : null;
     final stampImage = stampUrl != null ? await _downloadImage(stampUrl) : null;
+
+    print('✅ [PDF] Logo : ${logoImage != null ? "OK" : "NULL"}');
+    print('✅ [PDF] Signature : ${signatureImage != null ? "OK" : "NULL"}');
+    print('✅ [PDF] Cachet : ${stampImage != null ? "OK" : "NULL"}');
 
     final kDarkBlue = PdfColor.fromInt(0xFF1E3A8A);
     final kGray = PdfColor.fromInt(0xFF6B7280);
@@ -309,23 +319,37 @@ class PdfService {
       ),
     );
 
-    final directory = await getTemporaryDirectory();
+    // Sauvegarder dans Downloads
+    final directory = await getExternalStorageDirectory();
+    final downloadsDir = Directory('${directory!.path}/Download');
+    if (!await downloadsDir.exists()) {
+      await downloadsDir.create(recursive: true);
+    }
+    
     final fileName = '${invoiceData.invoiceNumber}.pdf';
-    final file = File('${directory.path}/$fileName');
+    final file = File('${downloadsDir.path}/$fileName');
     await file.writeAsBytes(await pdf.save());
+
+    print('✅ [PDF] Fichier sauvegardé : ${file.path}');
 
     return file;
   }
 
+  // FONCTION AVEC LOGS
   static Future<pw.MemoryImage?> _downloadImage(String url) async {
+    print('🔍 [DOWNLOAD] URL : $url');
     try {
       final response = await http.get(Uri.parse(url));
+      print('📡 [DOWNLOAD] Réponse HTTP : ${response.statusCode}');
       if (response.statusCode == 200) {
+        print('✅ [DOWNLOAD] Image téléchargée : ${response.bodyBytes.length} bytes');
         return pw.MemoryImage(response.bodyBytes);
+      } else {
+        print('❌ [DOWNLOAD] Erreur HTTP ${response.statusCode}');
+        return null;
       }
-      return null;
     } catch (e) {
-      print('Erreur telechargement image $url : $e');
+      print('❌ [DOWNLOAD] Erreur : $e');
       return null;
     }
   }
