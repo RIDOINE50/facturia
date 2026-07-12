@@ -27,16 +27,16 @@ class PdfService {
     print('🔍 [PDF] Signature URL : $signatureUrl');
     print('🔍 [PDF] Stamp URL : $stampUrl');
 
-    final pdf = pw.Document();
-
-    print('🔍 [PDF] Téléchargement des images...');
+    // Télécharger les images
     final logoBytes = logoUrl != null ? await _downloadImageBytes(logoUrl) : null;
     final signatureBytes = signatureUrl != null ? await _downloadImageBytes(signatureUrl) : null;
     final stampBytes = stampUrl != null ? await _downloadImageBytes(stampUrl) : null;
 
-    print('✅ [PDF] Logo : ${logoBytes != null ? "OK" : "NULL"}');
-    print('✅ [PDF] Signature : ${signatureBytes != null ? "OK" : "NULL"}');
-    print('✅ [PDF] Cachet : ${stampBytes != null ? "OK" : "NULL"}');
+    print('✅ [PDF] Logo bytes: ${logoBytes?.length ?? 0}');
+    print('✅ [PDF] Signature bytes: ${signatureBytes?.length ?? 0}');
+    print('✅ [PDF] Cachet bytes: ${stampBytes?.length ?? 0}');
+
+    final pdf = pw.Document();
 
     final kDarkBlue = PdfColor.fromInt(0xFF1E3A8A);
     final kGray = PdfColor.fromInt(0xFF6B7280);
@@ -50,7 +50,7 @@ class PdfService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // HEADER AVEC LOGO
+              // ========== HEADER AVEC LOGO ==========
               pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
@@ -58,15 +58,16 @@ class PdfService {
                     child: pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
+                        // LOGO - Affichage direct avec pw.Image
                         if (logoBytes != null) ...[
-                          pw.Container(
+                          pw.SizedBox(
                             width: 80,
                             height: 80,
-                            decoration: pw.BoxDecoration(
-                              image: pw.DecorationImage(
-                                image: pw.MemoryImage(logoBytes),
-                                fit: pw.BoxFit.contain,
-                              ),
+                            child: pw.Image(
+                              pw.MemoryImage(logoBytes),
+                              width: 80,
+                              height: 80,
+                              fit: pw.BoxFit.contain,
                             ),
                           ),
                           pw.SizedBox(width: 12),
@@ -127,7 +128,7 @@ class PdfService {
 
               pw.SizedBox(height: 30),
 
-              // INFOS FACTURE
+              // ========== INFOS FACTURE ==========
               pw.Container(
                 padding: const pw.EdgeInsets.all(12),
                 color: kLightGray,
@@ -162,7 +163,7 @@ class PdfService {
 
               pw.SizedBox(height: 30),
 
-              // CLIENT
+              // ========== CLIENT ==========
               pw.Text(
                 'FACTURE A',
                 style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: kGray),
@@ -175,7 +176,7 @@ class PdfService {
 
               pw.SizedBox(height: 30),
 
-              // TABLEAU
+              // ========== TABLEAU ==========
               pw.TableHelper.fromTextArray(
                 headerStyle: pw.TextStyle(
                   fontSize: 10,
@@ -207,7 +208,7 @@ class PdfService {
 
               pw.Spacer(),
 
-              // TOTAUX
+              // ========== TOTAUX ==========
               pw.Row(
                 children: [
                   pw.Expanded(child: pw.SizedBox()),
@@ -235,7 +236,7 @@ class PdfService {
 
               pw.SizedBox(height: 30),
 
-              // CONDITIONS
+              // ========== CONDITIONS ==========
               pw.Container(
                 padding: const pw.EdgeInsets.all(12),
                 color: kLightGray,
@@ -265,69 +266,64 @@ class PdfService {
                 ),
               ),
 
-              // SIGNATURE ET CACHET
+              // ========== SIGNATURE ET CACHET ==========
               if (signatureBytes != null || stampBytes != null) ...[
                 pw.SizedBox(height: 40),
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.end,
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
+                    // CACHET
                     if (stampBytes != null)
-                      pw.Container(
-                        width: 100,
-                        height: 100,
-                        margin: const pw.EdgeInsets.only(right: 20),
-                        child: pw.Column(
-                          children: [
-                            pw.Expanded(
-                              child: pw.Container(
-                                decoration: pw.BoxDecoration(
-                                  image: pw.DecorationImage(
-                                    image: pw.MemoryImage(stampBytes),
-                                    fit: pw.BoxFit.contain,
-                                  ),
-                                ),
-                              ),
+                      pw.Column(
+                        children: [
+                          pw.SizedBox(
+                            width: 100,
+                            height: 100,
+                            child: pw.Image(
+                              pw.MemoryImage(stampBytes),
+                              width: 100,
+                              height: 100,
+                              fit: pw.BoxFit.contain,
                             ),
-                            pw.SizedBox(height: 4),
-                            pw.Text(
-                              'Cachet',
-                              style: pw.TextStyle(fontSize: 9, color: kGray, fontStyle: pw.FontStyle.italic),
-                            ),
-                          ],
-                        ),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            'Cachet',
+                            style: pw.TextStyle(fontSize: 9, color: kGray, fontStyle: pw.FontStyle.italic),
+                          ),
+                        ],
                       ),
+                    if (stampBytes != null && signatureBytes != null)
+                      pw.SizedBox(width: 20),
+                    // SIGNATURE
                     if (signatureBytes != null)
-                      pw.Container(
-                        width: 150,
-                        height: 100,
-                        child: pw.Column(
-                          children: [
-                            pw.Expanded(
-                              child: pw.Container(
-                                decoration: pw.BoxDecoration(
-                                  image: pw.DecorationImage(
-                                    image: pw.MemoryImage(signatureBytes),
-                                    fit: pw.BoxFit.contain,
-                                  ),
-                                ),
-                              ),
+                      pw.Column(
+                        children: [
+                          pw.SizedBox(
+                            width: 150,
+                            height: 80,
+                            child: pw.Image(
+                              pw.MemoryImage(signatureBytes),
+                              width: 150,
+                              height: 80,
+                              fit: pw.BoxFit.contain,
                             ),
-                            pw.SizedBox(height: 4),
-                            pw.Container(
-                              width: double.infinity,
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border(top: pw.BorderSide(color: kGray, width: 0.5)),
-                              ),
-                              padding: const pw.EdgeInsets.only(top: 4),
-                              child: pw.Text(
-                                'Signature',
-                                style: pw.TextStyle(fontSize: 9, color: kGray, fontStyle: pw.FontStyle.italic),
-                                textAlign: pw.TextAlign.center,
-                              ),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Container(
+                            width: 150,
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border(top: pw.BorderSide(color: kGray, width: 0.5)),
                             ),
-                          ],
-                        ),
+                            padding: const pw.EdgeInsets.only(top: 4),
+                            child: pw.Text(
+                              'Signature',
+                              style: pw.TextStyle(fontSize: 9, color: kGray, fontStyle: pw.FontStyle.italic),
+                              textAlign: pw.TextAlign.center,
+                            ),
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -338,13 +334,13 @@ class PdfService {
       ),
     );
 
-    // Sauvegarder dans Downloads
+    // Sauvegarder
     final directory = await getExternalStorageDirectory();
     final downloadsDir = Directory('${directory!.path}/Download');
     if (!await downloadsDir.exists()) {
       await downloadsDir.create(recursive: true);
     }
-    
+
     final fileName = '${invoiceData.invoiceNumber}.pdf';
     final file = File('${downloadsDir.path}/$fileName');
     await file.writeAsBytes(await pdf.save());
@@ -354,7 +350,6 @@ class PdfService {
     return file;
   }
 
-  // NOUVELLE FONCTION : Télécharger les bytes directement
   static Future<Uint8List?> _downloadImageBytes(String url) async {
     print('🔍 [DOWNLOAD] URL : $url');
     try {
