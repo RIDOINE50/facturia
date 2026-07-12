@@ -94,6 +94,8 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return null;
 
+      print('🔄 [REFRESH] Début rechargement profil...');
+      
       final profileResponse = await Supabase.instance.client
           .from('profiles')
           .select('logo_url, signature_url, stamp_url')
@@ -147,9 +149,12 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
 
     try {
       print('🔍 Début génération PDF');
+      print('🔍 Appel _refreshUserProfile()...');
 
       // CORRECTION : Recharger les URLs à jour avant de générer le PDF
       final freshProfile = await _refreshUserProfile();
+
+      print('✅ Profil rechargé, création du PDF...');
 
       // Créer l'objet InvoiceData
       final invoiceData = InvoiceData();
@@ -214,6 +219,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
 
   Future<void> _shareInvoice() async {
     try {
+      print('🔍 Début partage PDF');
+      print('🔍 Appel _refreshUserProfile()...');
+
       // CORRECTION : Recharger les URLs à jour
       final freshProfile = await _refreshUserProfile();
 
