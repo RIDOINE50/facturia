@@ -30,13 +30,13 @@ class PdfService {
     final pdf = pw.Document();
 
     print('🔍 [PDF] Téléchargement des images...');
-    final logoImage = logoUrl != null ? await _downloadImage(logoUrl) : null;
-    final signatureImage = signatureUrl != null ? await _downloadImage(signatureUrl) : null;
-    final stampImage = stampUrl != null ? await _downloadImage(stampUrl) : null;
+    final logoBytes = logoUrl != null ? await _downloadImageBytes(logoUrl) : null;
+    final signatureBytes = signatureUrl != null ? await _downloadImageBytes(signatureUrl) : null;
+    final stampBytes = stampUrl != null ? await _downloadImageBytes(stampUrl) : null;
 
-    print('✅ [PDF] Logo : ${logoImage != null ? "OK" : "NULL"}');
-    print('✅ [PDF] Signature : ${signatureImage != null ? "OK" : "NULL"}');
-    print('✅ [PDF] Cachet : ${stampImage != null ? "OK" : "NULL"}');
+    print('✅ [PDF] Logo : ${logoBytes != null ? "OK" : "NULL"}');
+    print('✅ [PDF] Signature : ${signatureBytes != null ? "OK" : "NULL"}');
+    print('✅ [PDF] Cachet : ${stampBytes != null ? "OK" : "NULL"}');
 
     final kDarkBlue = PdfColor.fromInt(0xFF1E3A8A);
     final kGray = PdfColor.fromInt(0xFF6B7280);
@@ -58,11 +58,16 @@ class PdfService {
                     child: pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        if (logoImage != null) ...[
+                        if (logoBytes != null) ...[
                           pw.Container(
                             width: 80,
                             height: 80,
-                            child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                            decoration: pw.BoxDecoration(
+                              image: pw.DecorationImage(
+                                image: pw.MemoryImage(logoBytes),
+                                fit: pw.BoxFit.contain,
+                              ),
+                            ),
                           ),
                           pw.SizedBox(width: 12),
                         ],
@@ -261,13 +266,13 @@ class PdfService {
               ),
 
               // SIGNATURE ET CACHET
-              if (signatureImage != null || stampImage != null) ...[
+              if (signatureBytes != null || stampBytes != null) ...[
                 pw.SizedBox(height: 40),
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.end,
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
-                    if (stampImage != null)
+                    if (stampBytes != null)
                       pw.Container(
                         width: 100,
                         height: 100,
@@ -275,7 +280,14 @@ class PdfService {
                         child: pw.Column(
                           children: [
                             pw.Expanded(
-                              child: pw.Image(stampImage, fit: pw.BoxFit.contain),
+                              child: pw.Container(
+                                decoration: pw.BoxDecoration(
+                                  image: pw.DecorationImage(
+                                    image: pw.MemoryImage(stampBytes),
+                                    fit: pw.BoxFit.contain,
+                                  ),
+                                ),
+                              ),
                             ),
                             pw.SizedBox(height: 4),
                             pw.Text(
@@ -285,14 +297,21 @@ class PdfService {
                           ],
                         ),
                       ),
-                    if (signatureImage != null)
+                    if (signatureBytes != null)
                       pw.Container(
                         width: 150,
                         height: 100,
                         child: pw.Column(
                           children: [
                             pw.Expanded(
-                              child: pw.Image(signatureImage, fit: pw.BoxFit.contain),
+                              child: pw.Container(
+                                decoration: pw.BoxDecoration(
+                                  image: pw.DecorationImage(
+                                    image: pw.MemoryImage(signatureBytes),
+                                    fit: pw.BoxFit.contain,
+                                  ),
+                                ),
+                              ),
                             ),
                             pw.SizedBox(height: 4),
                             pw.Container(
@@ -335,15 +354,15 @@ class PdfService {
     return file;
   }
 
-  // FONCTION AVEC LOGS
-  static Future<pw.MemoryImage?> _downloadImage(String url) async {
+  // NOUVELLE FONCTION : Télécharger les bytes directement
+  static Future<Uint8List?> _downloadImageBytes(String url) async {
     print('🔍 [DOWNLOAD] URL : $url');
     try {
       final response = await http.get(Uri.parse(url));
       print('📡 [DOWNLOAD] Réponse HTTP : ${response.statusCode}');
       if (response.statusCode == 200) {
         print('✅ [DOWNLOAD] Image téléchargée : ${response.bodyBytes.length} bytes');
-        return pw.MemoryImage(response.bodyBytes);
+        return response.bodyBytes;
       } else {
         print('❌ [DOWNLOAD] Erreur HTTP ${response.statusCode}');
         return null;
