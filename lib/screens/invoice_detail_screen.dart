@@ -88,6 +88,34 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
   }
 
+  // NOUVELLE FONCTION : Recharger les URLs du profil à jour
+  Future<Map<String, dynamic>?> _refreshUserProfile() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return null;
+
+      final profileResponse = await Supabase.instance.client
+          .from('profiles')
+          .select('logo_url, signature_url, stamp_url')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      print('🔄 [REFRESH] Profil rechargé');
+      print('🔄 [REFRESH] Logo URL : ${profileResponse?['logo_url']}');
+      print('🔄 [REFRESH] Signature URL : ${profileResponse?['signature_url']}');
+      print('🔄 [REFRESH] Stamp URL : ${profileResponse?['stamp_url']}');
+
+      setState(() {
+        _userProfile = profileResponse;
+      });
+
+      return profileResponse;
+    } catch (e) {
+      print('❌ [REFRESH] Erreur : $e');
+      return null;
+    }
+  }
+
   String _formatAmount(double amount) {
     return amount.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
@@ -119,7 +147,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
 
     try {
       print('🔍 Début génération PDF');
-      print('🔍 _userProfile: $_userProfile');
+
+      // CORRECTION : Recharger les URLs à jour avant de générer le PDF
+      final freshProfile = await _refreshUserProfile();
 
       // Créer l'objet InvoiceData
       final invoiceData = InvoiceData();
@@ -133,9 +163,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       )).toList();
       invoiceData.applyTva = (_invoice!['tva_amount'] as num).toDouble() > 0;
 
-      final logoUrl = _userProfile?['logo_url'];
-      final signatureUrl = _userProfile?['signature_url'];
-      final stampUrl = _userProfile?['stamp_url'];
+      final logoUrl = freshProfile?['logo_url'];
+      final signatureUrl = freshProfile?['signature_url'];
+      final stampUrl = freshProfile?['stamp_url'];
 
       print('🖼️ Logo URL passé au PDF : $logoUrl');
       print('✍️ Signature URL passé au PDF : $signatureUrl');
@@ -184,6 +214,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
 
   Future<void> _shareInvoice() async {
     try {
+      // CORRECTION : Recharger les URLs à jour
+      final freshProfile = await _refreshUserProfile();
+
       final invoiceData = InvoiceData();
       invoiceData.invoiceNumber = _invoice!['invoice_number'] ?? '';
       invoiceData.issueDate = DateTime.parse(_invoice!['issue_date']);
@@ -206,9 +239,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         clientPhone: _client?['phone'] ?? '',
         clientEmail: _client?['email'] ?? '',
         clientAddress: _client?['address'] ?? '',
-        logoUrl: _userProfile?['logo_url'],
-        signatureUrl: _userProfile?['signature_url'],
-        stampUrl: _userProfile?['stamp_url'],
+        logoUrl: freshProfile?['logo_url'],
+        signatureUrl: freshProfile?['signature_url'],
+        stampUrl: freshProfile?['stamp_url'],
       );
 
       await Share.shareXFiles(
@@ -296,6 +329,15 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          // NOUVEAU BOUTON REFRESH
+          IconButton(
+            icon: const Icon(Icons.refresh, color: kDarkBlue),
+            onPressed: () {
+              setState(() => _isLoading = true);
+              _loadInvoiceData();
+            },
+            tooltip: 'Rafraîchir',
+          ),
           IconButton(
             icon: const Icon(Icons.download, color: kDarkBlue),
             onPressed: _downloadPDF,
