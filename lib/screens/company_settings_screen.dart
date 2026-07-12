@@ -42,62 +42,116 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
 
   Future<void> _saveToSupabase() async {
     setState(() => _isSaving = true);
+    print('🔍 [SAVE] Début sauvegarde...');
+    
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception('Non connecté');
 
-      const bucket = 'company-assets'; // ⚠️ À créer dans Supabase (voir instructions plus bas)
+      const bucket = 'company-assets';
       final userId = user.id;
+      print('🔍 [SAVE] User ID: $userId');
+
+      String? logoUrl;
+      String? signatureUrl;
+      String? stampUrl;
 
       // 1. Upload Logo
-      String? logoUrl;
       if (_logoFile != null) {
+        print('🔍 [SAVE] Upload logo...');
         final ext = path.extension(_logoFile!.path);
-        await Supabase.instance.client.storage.from(bucket).upload(
-          '$userId/logo$ext',
-          _logoFile!,
-          fileOptions: FileOptions(cacheControl: '3600', upsert: true),
-        );
-        logoUrl = Supabase.instance.client.storage.from(bucket).getPublicUrl('$userId/logo$ext');
+        final filePath = '$userId/logo$ext';
+        
+        try {
+          await Supabase.instance.client.storage.from(bucket).upload(
+            filePath,
+            _logoFile!,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+          );
+          print('✅ [SAVE] Logo uploadé');
+          
+          // CORRECTION : getPublicUrl retourne une String directement
+          logoUrl = Supabase.instance.client.storage.from(bucket).getPublicUrl(filePath);
+          print('✅ [SAVE] Logo URL: $logoUrl');
+        } catch (e) {
+          print('❌ [SAVE] Erreur upload logo: $e');
+        }
+      } else {
+        print('⚠️ [SAVE] Pas de logo à uploader');
       }
 
       // 2. Upload Signature
-      String? signatureUrl;
+      print('🔍 [SAVE] Upload signature...');
       final signatureBytes = await _signatureController.toPngBytes();
-      if (signatureBytes != null) {
-        await Supabase.instance.client.storage.from(bucket).uploadBinary(
-          '$userId/signature.png',
-          signatureBytes,
-          fileOptions: FileOptions(cacheControl: '3600', upsert: true),
-        );
-        signatureUrl = Supabase.instance.client.storage.from(bucket).getPublicUrl('$userId/signature.png');
+      if (signatureBytes != null && signatureBytes.isNotEmpty) {
+        print('✅ [SAVE] Signature bytes: ${signatureBytes.length} bytes');
+        final filePath = '$userId/signature.png';
+        
+        try {
+          await Supabase.instance.client.storage.from(bucket).uploadBinary(
+            filePath,
+            signatureBytes,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+          );
+          print('✅ [SAVE] Signature uploadée');
+          
+          signatureUrl = Supabase.instance.client.storage.from(bucket).getPublicUrl(filePath);
+          print('✅ [SAVE] Signature URL: $signatureUrl');
+        } catch (e) {
+          print('❌ [SAVE] Erreur upload signature: $e');
+        }
+      } else {
+        print('⚠️ [SAVE] Pas de signature à uploader (bytes null ou vide)');
       }
 
       // 3. Upload Cachet
-      String? stampUrl;
       if (_stampFile != null) {
+        print('🔍 [SAVE] Upload cachet...');
         final ext = path.extension(_stampFile!.path);
-        await Supabase.instance.client.storage.from(bucket).upload(
-          '$userId/stamp$ext',
-          _stampFile!,
-          fileOptions: FileOptions(cacheControl: '3600', upsert: true),
-        );
-        stampUrl = Supabase.instance.client.storage.from(bucket).getPublicUrl('$userId/stamp$ext');
+        final filePath = '$userId/stamp$ext';
+        
+        try {
+          await Supabase.instance.client.storage.from(bucket).upload(
+            filePath,
+            _stampFile!,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+          );
+          print('✅ [SAVE] Cachet uploadé');
+          
+          stampUrl = Supabase.instance.client.storage.from(bucket).getPublicUrl(filePath);
+          print('✅ [SAVE] Cachet URL: $stampUrl');
+        } catch (e) {
+          print('❌ [SAVE] Erreur upload cachet: $e');
+        }
+      } else {
+        print('⚠️ [SAVE] Pas de cachet à uploader');
       }
 
       // 4. Sauvegarder les URLs dans la table 'profiles'
-      await Supabase.instance.client.from('profiles').update({
-        'logo_url': logoUrl,
-        'signature_url': signatureUrl,
-        'stamp_url': stampUrl,
-      }).eq('id', userId);
+      print('🔍 [SAVE] Sauvegarde dans profiles...');
+      print('🔍 [SAVE] Logo: $logoUrl');
+      print('🔍 [SAVE] Signature: $signatureUrl');
+      print('🔍 [SAVE] Cachet: $stampUrl');
+      
+      final response = await Supabase.instance.client
+          .from('profiles')
+          .update({
+            'logo_url': logoUrl,
+            'signature_url': signatureUrl,
+            'stamp_url': stampUrl,
+          })
+          .eq('id', userId)
+          .select();
+      
+      print('✅ [SAVE] Réponse Supabase: $response');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Paramètres sauvegardés !')),
+          SnackBar(content: Text('✅ Paramètres sauvegardés !\nLogo: ${logoUrl != null ? "OK" : "NULL"}')),
         );
       }
     } catch (e) {
+      print('❌ [SAVE] Erreur générale: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('❌ Erreur : $e')),
