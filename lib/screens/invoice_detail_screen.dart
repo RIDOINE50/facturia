@@ -30,7 +30,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   Map<String, dynamic>? _invoice;
   Map<String, dynamic>? _company;
   Map<String, dynamic>? _client;
-  Map<String, dynamic>? _userProfile;
   List<Map<String, dynamic>> _items = [];
   bool _isLoading = true;
 
@@ -45,8 +44,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
 
-      print('🔍 Chargement facture ID: ${widget.invoiceId}');
-
       final invoiceResponse = await Supabase.instance.client
           .from('invoices')
           .select('*, clients(*)')
@@ -60,28 +57,35 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           .select()
           .eq('invoice_id', widget.invoiceId);
 
-      final profileResponse = await Supabase.instance.client
-          .from('profiles')
-          .select('logo_url, signature_url, stamp_url')
-          .eq('id', user.id)
-          .maybeSingle();
-
-      print('🖼️ Logo URL : ${profileResponse?['logo_url']}');
-      print('✍️ Signature URL : ${profileResponse?['signature_url']}');
-      print('🔏 Stamp URL : ${profileResponse?['stamp_url']}');
-
       setState(() {
         _invoice = invoiceResponse;
         _company = companyResponse;
         _client = invoiceResponse['clients'];
         _items = List<Map<String, dynamic>>.from(itemsResponse);
-        _userProfile = profileResponse;
         _isLoading = false;
       });
     } catch (e) {
       print('❌ Erreur chargement facture : $e');
       setState(() => _isLoading = false);
     }
+  }
+
+  // NOUVELLE FONCTION : Récupérer les URLs directement depuis Supabase
+  Future<Map<String, dynamic>> _getUserImageUrls() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return {};
+
+    final profile = await Supabase.instance.client
+        .from('profiles')
+        .select('logo_url, signature_url, stamp_url')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    print('🔍 [URLS] Logo: ${profile?['logo_url']}');
+    print('🔍 [URLS] Signature: ${profile?['signature_url']}');
+    print('🔍 [URLS] Cachet: ${profile?['stamp_url']}');
+
+    return profile ?? {};
   }
 
   String _formatAmount(double amount) {
@@ -115,7 +119,16 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
 
     try {
       print('🔍 Début génération PDF');
-      print('🔍 _userProfile: $_userProfile');
+
+      // RECHARGER LES URLs DIRECTEMENT DEPUIS SUPABASE
+      final urls = await _getUserImageUrls();
+      final logoUrl = urls['logo_url'] as String?;
+      final signatureUrl = urls['signature_url'] as String?;
+      final stampUrl = urls['stamp_url'] as String?;
+
+      print('🖼️ Logo URL : $logoUrl');
+      print('✍️ Signature URL : $signatureUrl');
+      print('🔏 Stamp URL : $stampUrl');
 
       final invoiceData = InvoiceData();
       invoiceData.invoiceNumber = _invoice!['invoice_number'] ?? '';
@@ -127,14 +140,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         unitPrice: (item['unit_price'] as num).toDouble(),
       )).toList();
       invoiceData.applyTva = (_invoice!['tva_amount'] as num).toDouble() > 0;
-
-      final logoUrl = _userProfile?['logo_url'];
-      final signatureUrl = _userProfile?['signature_url'];
-      final stampUrl = _userProfile?['stamp_url'];
-
-      print('🖼️ Logo URL passé au PDF : $logoUrl');
-      print('✍️ Signature URL passé au PDF : $signatureUrl');
-      print('🔏 Stamp URL passé au PDF : $stampUrl');
 
       final pdfFile = await PdfService.generateInvoicePdf(
         invoiceData: invoiceData,
@@ -152,19 +157,18 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         stampUrl: stampUrl,
       );
 
-      print('✅ PDF généré avec succès : ${pdfFile.path}');
+      print('✅ PDF généré : ${pdfFile.path}');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ PDF généré : ${pdfFile.path}'),
+            content: Text('✅ PDF généré'),
             backgroundColor: kGreen,
-            duration: const Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
-      print('❌ Erreur génération PDF : $e');
+      print('❌ Erreur : $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -178,6 +182,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
 
   Future<void> _shareInvoice() async {
     try {
+      // RECHARGER LES URLs DIRECTEMENT DEPUIS SUPABASE
+      final urls = await _getUserImageUrls();
+
       final invoiceData = InvoiceData();
       invoiceData.invoiceNumber = _invoice!['invoice_number'] ?? '';
       invoiceData.issueDate = DateTime.parse(_invoice!['issue_date']);
@@ -200,9 +207,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         clientPhone: _client?['phone'] ?? '',
         clientEmail: _client?['email'] ?? '',
         clientAddress: _client?['address'] ?? '',
-        logoUrl: _userProfile?['logo_url'],
-        signatureUrl: _userProfile?['signature_url'],
-        stampUrl: _userProfile?['stamp_url'],
+        logoUrl: urls['logo_url'] as String?,
+        signatureUrl: urls['signature_url'] as String?,
+        stampUrl: urls['stamp_url'] as String?,
       );
 
       await Share.shareXFiles(
@@ -211,14 +218,6 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       );
     } catch (e) {
       print('❌ Erreur partage : $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Erreur : $e'),
-            backgroundColor: kRed,
-          ),
-        );
-      }
     }
   }
 
@@ -582,17 +581,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                       children: [
                         Text('CONDITIONS DE PAIEMENT', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: kGrayText, letterSpacing: 0.5)),
                         const SizedBox(height: 8),
-                        Text('Paiement dû dans les 30 jours suivant la date d\'émission. En cas de retard, pénalités de 1,5% par mois appliquées.', style: GoogleFonts.inter(fontSize: 10, color: kGrayText, height: 1.5)),
-                        const SizedBox(height: 12),
-                        Text('MODES DE PAIEMENT ACCEPTÉS', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: kGrayText, letterSpacing: 0.5)),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: kGreen, borderRadius: BorderRadius.circular(4)), child: const Icon(Icons.phone_android, color: Colors.white, size: 12)),
-                            const SizedBox(width: 8),
-                            Text('MTN: ${_company!['mobile_money_number'] ?? ''}', style: GoogleFonts.inter(fontSize: 10, color: Colors.black87)),
-                          ],
-                        ),
+                        Text('Paiement dû dans les 30 jours.', style: GoogleFonts.inter(fontSize: 10, color: kGrayText, height: 1.5)),
                       ],
                     ),
                   ),
